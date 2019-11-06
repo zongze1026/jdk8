@@ -581,14 +581,14 @@ public abstract class AbstractQueuedSynchronizer
      * @return node's predecessor
      */
     private Node enq(final Node node) {
-        for (;;) {
+        for (;;) {    //存在并发的情况，自旋添加到队列
             Node t = tail;
-            if (t == null) { // Must initialize
-                if (compareAndSetHead(new Node()))
+            if (t == null) { // 存在并发情况，再次判断队列是否需要初始化
+                if (compareAndSetHead(new Node()))  //CAS初始化队列；头结点和尾结点都指向初始化节点
                     tail = head;
             } else {
                 node.prev = t;
-                if (compareAndSetTail(t, node)) {
+                if (compareAndSetTail(t, node)) {  //直接添加到队列尾部
                     t.next = node;
                     return t;
                 }
@@ -602,18 +602,18 @@ public abstract class AbstractQueuedSynchronizer
      * @param mode Node.EXCLUSIVE for exclusive, Node.SHARED for shared
      * @return the new node
      */
-    private Node addWaiter(Node mode) {
+    private Node addWaiter(Node mode) { //mode表示节点是独占还是共享类型；独占使用null,共享SHARE
         Node node = new Node(Thread.currentThread(), mode);
         // Try the fast path of enq; backup to full enq on failure
         Node pred = tail;
-        if (pred != null) {
+        if (pred != null) {  //尾结点不为空；把尾结点作为新建节点的prev节点
             node.prev = pred;
-            if (compareAndSetTail(pred, node)) {
-                pred.next = node;
+            if (compareAndSetTail(pred, node)) {  //没有获取到同步状态的线程都会添加到阻塞队列
+                pred.next = node;                  //因此存在并发的情况，CAS添加尾结点
                 return node;
             }
         }
-        enq(node);
+        enq(node);  //初始化阻塞队列并添加尾结点
         return node;
     }
 
