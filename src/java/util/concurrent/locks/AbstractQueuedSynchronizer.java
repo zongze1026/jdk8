@@ -652,9 +652,9 @@ public abstract class AbstractQueuedSynchronizer
          * non-cancelled successor.
          */
         Node s = node.next; //取队列中等待获取锁的下一个节点
-        if (s == null || s.waitStatus > 0) {  //TODO 正常情况waitStatus都为负一，并且节点都不会为空
+        if (s == null || s.waitStatus > 0) {  //正常情况waitStatus都为负一，并且节点都不会为空
             s = null;
-            for (Node t = tail; t != null && t != node; t = t.prev)
+            for (Node t = tail; t != null && t != node; t = t.prev)//TODO 没明白为什么从尾节点取
                 if (t.waitStatus <= 0)
                     s = t;
         }
@@ -684,9 +684,9 @@ public abstract class AbstractQueuedSynchronizer
             if (h != null && h != tail) {
                 int ws = h.waitStatus;
                 if (ws == Node.SIGNAL) {
-                    if (!compareAndSetWaitStatus(h, Node.SIGNAL, 0))
+                    if (!compareAndSetWaitStatus(h, Node.SIGNAL, 0))//将头结点的waitStatus修改成0
                         continue;            // loop to recheck cases
-                    unparkSuccessor(h);
+                    unparkSuccessor(h);  //唤醒后继节点
                 }
                 else if (ws == 0 &&
                          !compareAndSetWaitStatus(h, 0, Node.PROPAGATE))
@@ -724,7 +724,7 @@ public abstract class AbstractQueuedSynchronizer
          * racing acquires/releases, so most need signals now or soon
          * anyway.
          */
-        if (propagate > 0 || h == null || h.waitStatus < 0 ||
+        if (propagate > 0 || h == null || h.waitStatus < 0 ||     //propagate大于零表示还有可获取的资源
             (h = head) == null || h.waitStatus < 0) {
             Node s = node.next;
             if (s == null || s.isShared())
@@ -946,7 +946,7 @@ public abstract class AbstractQueuedSynchronizer
      * @param arg the acquire argument
      */
     private void doAcquireShared(int arg) {
-        final Node node = addWaiter(Node.SHARED);
+        final Node node = addWaiter(Node.SHARED); //mode以SHARED的形式添加到队列尾部
         boolean failed = true;
         try {
             boolean interrupted = false;
@@ -958,7 +958,7 @@ public abstract class AbstractQueuedSynchronizer
                         setHeadAndPropagate(node, r);
                         p.next = null; // help GC
                         if (interrupted)
-                            selfInterrupt();
+                            selfInterrupt(); //如果有被打断过的话就补上打断的状态
                         failed = false;
                         return;
                     }
@@ -1072,6 +1072,10 @@ public abstract class AbstractQueuedSynchronizer
      *         correctly.
      * @throws UnsupportedOperationException if exclusive mode is not supported
      */
+
+    /**
+     * ：独占方式。尝试获取资源，成功则返回true，失败则返回false
+     */
     protected boolean tryAcquire(int arg) {
         throw new UnsupportedOperationException();
     }
@@ -1097,6 +1101,11 @@ public abstract class AbstractQueuedSynchronizer
      *         thrown in a consistent fashion for synchronization to work
      *         correctly.
      * @throws UnsupportedOperationException if exclusive mode is not supported
+     */
+
+
+    /**
+     * 独占方式。尝试释放资源，成功则返回true，失败则返回false。
      */
     protected boolean tryRelease(int arg) {
         throw new UnsupportedOperationException();
@@ -1134,6 +1143,11 @@ public abstract class AbstractQueuedSynchronizer
      *         correctly.
      * @throws UnsupportedOperationException if shared mode is not supported
      */
+
+
+    /**
+     * 共享方式。尝试获取资源。负数表示失败；0表示成功，但没有剩余可用资源；正数表示成功，且有剩余资源
+     */
     protected int tryAcquireShared(int arg) {
         throw new UnsupportedOperationException();
     }
@@ -1158,6 +1172,11 @@ public abstract class AbstractQueuedSynchronizer
      *         thrown in a consistent fashion for synchronization to work
      *         correctly.
      * @throws UnsupportedOperationException if shared mode is not supported
+     */
+
+
+    /**
+     * 共享方式。尝试释放资源，如果释放后允许唤醒后续等待结点返回true，否则返回false
      */
     protected boolean tryReleaseShared(int arg) {
         throw new UnsupportedOperationException();
