@@ -651,8 +651,8 @@ public abstract class AbstractQueuedSynchronizer
          * traverse backwards from tail to find the actual
          * non-cancelled successor.
          */
-        Node s = node.next;
-        if (s == null || s.waitStatus > 0) {
+        Node s = node.next; //取队列中等待获取锁的下一个节点
+        if (s == null || s.waitStatus > 0) {  //TODO 正常情况waitStatus都为负一，并且节点都不会为空
             s = null;
             for (Node t = tail; t != null && t != node; t = t.prev)
                 if (t.waitStatus <= 0)
@@ -748,7 +748,7 @@ public abstract class AbstractQueuedSynchronizer
 
         // Skip cancelled predecessors
         Node pred = node.prev;
-        while (pred.waitStatus > 0)
+        while (pred.waitStatus > 0)   //循环查找前一个没有被打断的节点
             node.prev = pred = pred.prev;
 
         // predNext is the apparent node to unsplice. CASes below will
@@ -833,8 +833,8 @@ public abstract class AbstractQueuedSynchronizer
      * @return {@code true} if interrupted
      */
     private final boolean parkAndCheckInterrupt() {
-        LockSupport.park(this);
-        return Thread.interrupted();
+        LockSupport.park(this);   //阻塞线程进入wait状态
+        return Thread.interrupted();       //如果线程被打断，返回true
     }
 
     /*
@@ -860,14 +860,14 @@ public abstract class AbstractQueuedSynchronizer
             boolean interrupted = false;
             for (;;) {
                 final Node p = node.predecessor();
-                if (p == head && tryAcquire(arg)) {
+                if (p == head && tryAcquire(arg)) { //如果pre节点时头结点，则获取同步锁；获取成功的话就设置自身节点为头结点
                     setHead(node);
                     p.next = null; // help GC
                     failed = false;
                     return interrupted;
                 }
                 if (shouldParkAfterFailedAcquire(p, node) &&
-                    parkAndCheckInterrupt())
+                    parkAndCheckInterrupt())  //如果线程在阻塞过程中有被打断过，interrupted记录为true返回给acquire方法
                     interrupted = true;
             }
         } finally {
@@ -1197,8 +1197,8 @@ public abstract class AbstractQueuedSynchronizer
     public final void acquire(int arg) {
         if (!tryAcquire(arg) &&
             acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
-            selfInterrupt();
-    }
+            selfInterrupt(); //如果线程被打断过的话，给自身添加一个打断信号
+    }                        // 外面就可以根据自身线程是否打断状态来判断是否需要执行业务操作
 
     /**
      * Acquires in exclusive mode, aborting if interrupted.
@@ -1259,9 +1259,9 @@ public abstract class AbstractQueuedSynchronizer
      */
     public final boolean release(int arg) {
         if (tryRelease(arg)) {
-            Node h = head;
-            if (h != null && h.waitStatus != 0)
-                unparkSuccessor(h);
+            Node h = head;                       //头结点有两种存在形式：1.阻塞队列初始化话的头结点，没有任何意义的节点
+            if (h != null && h.waitStatus != 0)  // 2.当同步锁被阻塞队列中的线程抢到，那么头结点就变成了当前获取到锁的节点；
+                unparkSuccessor(h);                //不论哪种情况头结点的下一个节点就是在阻塞队列最前头的一个节点
             return true;
         }
         return false;
