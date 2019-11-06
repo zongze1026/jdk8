@@ -1535,7 +1535,7 @@ public abstract class AbstractQueuedSynchronizer
         Node t = tail; // Read fields in reverse initialization order
         Node h = head;
         Node s;
-        return h != t &&
+        return h != t &&  //这个几个判断就是想表示头结点的next节点是否存在
             ((s = h.next) == null || s.thread != Thread.currentThread());
     }
 

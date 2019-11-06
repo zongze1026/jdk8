@@ -260,22 +260,23 @@ public class ReentrantReadWriteLock
          */
 
         static final int SHARED_SHIFT   = 16;
-        static final int SHARED_UNIT    = (1 << SHARED_SHIFT);
-        static final int MAX_COUNT      = (1 << SHARED_SHIFT) - 1;
-        static final int EXCLUSIVE_MASK = (1 << SHARED_SHIFT) - 1;
+        static final int SHARED_UNIT    = (1 << SHARED_SHIFT);  //由于读锁用高位部分，所以读锁个数加1，其实是状态值加 2^16
+        static final int MAX_COUNT      = (1 << SHARED_SHIFT) - 1; //写锁的可重入的最大次数、读锁允许的最大数量
+        static final int EXCLUSIVE_MASK = (1 << SHARED_SHIFT) - 1; //写锁的掩码，用于状态的低16位有效值
 
-        /** Returns the number of shared holds represented in count  */
+        //当前持有读锁的线程数
         static int sharedCount(int c)    { return c >>> SHARED_SHIFT; }
-        /** Returns the number of exclusive holds represented in count  */
+        //写锁的计数，也就是它的重入次数
         static int exclusiveCount(int c) { return c & EXCLUSIVE_MASK; }
 
+
+
         /**
-         * A counter for per-thread read hold counts.
-         * Maintained as a ThreadLocal; cached in cachedHoldCounter
+         * 每个线程特定的read重入计数。存放在ThreadLocal，不需要是线程安全的
          */
         static final class HoldCounter {
             int count = 0;
-            // Use id, not reference, to avoid garbage retention
+            // 使用id而不是引用是为了避免保留垃圾。注意这是个常量。
             final long tid = getThreadId(Thread.currentThread());
         }
 
@@ -291,52 +292,36 @@ public class ReentrantReadWriteLock
         }
 
         /**
-         * The number of reentrant read locks held by current thread.
-         * Initialized only in constructor and readObject.
-         * Removed whenever a thread's read hold count drops to 0.
+         * 保存当前线程重入读锁的次数的容器。在读锁重入次数为 0 时移除。
          */
         private transient ThreadLocalHoldCounter readHolds;
 
         /**
-         * The hold count of the last thread to successfully acquire
-         * readLock. This saves ThreadLocal lookup in the common case
-         * where the next thread to release is the last one to
-         * acquire. This is non-volatile since it is just used
-         * as a heuristic, and would be great for threads to cache.
-         *
-         * <p>Can outlive the Thread for which it is caching the read
-         * hold count, but avoids garbage retention by not retaining a
-         * reference to the Thread.
-         *
-         * <p>Accessed via a benign data race; relies on the memory
-         * model's final field and out-of-thin-air guarantees.
+         * 最近一个成功获取读锁的线程的计数。这省却了ThreadLocal查找，
+         * 通常情况下，下一个释放线程是最后一个获取线程。这不是 volatile 的，
+         * 因为它仅用于试探的，线程进行缓存也是可以的
+         * （因为判断是否是当前线程是通过线程id来比较的）。
          */
         private transient HoldCounter cachedHoldCounter;
 
         /**
-         * firstReader is the first thread to have acquired the read lock.
-         * firstReaderHoldCount is firstReader's hold count.
+         * firstReader是这样一个特殊线程：它是最后一个把 共享计数 从 0 改为 1 的
+         * （在锁空闲的时候），而且从那之后还没有释放读锁的。如果不存在则为null。
+         * firstReaderHoldCount 是 firstReader 的重入计数。
          *
-         * <p>More precisely, firstReader is the unique thread that last
-         * changed the shared count from 0 to 1, and has not released the
-         * read lock since then; null if there is no such thread.
+         * firstReader 不能导致保留垃圾，因此在 tryReleaseShared 里设置为null，
+         * 除非线程异常终止，没有释放读锁。
          *
-         * <p>Cannot cause garbage retention unless the thread terminated
-         * without relinquishing its read locks, since tryReleaseShared
-         * sets it to null.
+         * 作用是在跟踪无竞争的读锁计数时非常便宜。
          *
-         * <p>Accessed via a benign data race; relies on the memory
-         * model's out-of-thin-air guarantees for references.
-         *
-         * <p>This allows tracking of read holds for uncontended read
-         * locks to be very cheap.
+         * firstReader及其计数firstReaderHoldCount是不会放入 readHolds 的。
          */
         private transient Thread firstReader = null;
         private transient int firstReaderHoldCount;
 
         Sync() {
             readHolds = new ThreadLocalHoldCounter();
-            setState(getState()); // ensures visibility of readHolds
+            setState(getState()); // 确保 readHolds 的内存可见性，利用 volatile 写的内存语义。
         }
 
         /*
