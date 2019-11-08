@@ -261,10 +261,10 @@ public class ReentrantReadWriteLock
 
         static final int SHARED_SHIFT   = 16;
         static final int SHARED_UNIT    = (1 << SHARED_SHIFT);  //由于读锁用高位部分，所以读锁个数加1，其实是状态值加 2^16
-        static final int MAX_COUNT      = (1 << SHARED_SHIFT) - 1; //写锁的可重入的最大次数、读锁允许的最大数量
+        static final int MAX_COUNT      = (1 << SHARED_SHIFT) - 1; //写锁的可重入的最大次数、并发情况下读锁可获取次数
         static final int EXCLUSIVE_MASK = (1 << SHARED_SHIFT) - 1; //写锁的掩码，用于状态的低16位有效值
 
-        //当前持有读锁的线程数
+        //并发情况下读锁的重入次数
         static int sharedCount(int c)    { return c >>> SHARED_SHIFT; }
         //写锁的计数，也就是它的重入次数
         static int exclusiveCount(int c) { return c & EXCLUSIVE_MASK; }
@@ -297,23 +297,13 @@ public class ReentrantReadWriteLock
         private transient ThreadLocalHoldCounter readHolds;
 
         /**
-         * 最近一个成功获取读锁的线程的计数。这省却了ThreadLocal查找，
-         * 通常情况下，下一个释放线程是最后一个获取线程。这不是 volatile 的，
-         * 因为它仅用于试探的，线程进行缓存也是可以的
-         * （因为判断是否是当前线程是通过线程id来比较的）。
+         *该属性记录的是最近一个获取读锁的线程（firstThread除外）的id和重入锁的计数
          */
         private transient HoldCounter cachedHoldCounter;
 
         /**
-         * firstReader是这样一个特殊线程：它是最后一个把 共享计数 从 0 改为 1 的
-         * （在锁空闲的时候），而且从那之后还没有释放读锁的。如果不存在则为null。
-         * firstReaderHoldCount 是 firstReader 的重入计数。
-         *
-         * firstReader 不能导致保留垃圾，因此在 tryReleaseShared 里设置为null，
-         * 除非线程异常终止，没有释放读锁。
-         *
-         * 作用是在跟踪无竞争的读锁计数时非常便宜。
-         *
+         * firstReader第一个获取读锁的线程
+         * firstReaderHoldCount第一个获取读锁线程的可重入次数
          * firstReader及其计数firstReaderHoldCount是不会放入 readHolds 的。
          */
         private transient Thread firstReader = null;
@@ -400,18 +390,18 @@ public class ReentrantReadWriteLock
 
         protected final boolean tryReleaseShared(int unused) {
             Thread current = Thread.currentThread();
-            if (firstReader == current) {
+            if (firstReader == current) {  //当前线程是第一个获取读锁的线程
                 // assert firstReaderHoldCount > 0;
-                if (firstReaderHoldCount == 1)
+                if (firstReaderHoldCount == 1) //firstThread重入次数还剩一次的话，直接将firstReader置为null，否则重入次数减1
                     firstReader = null;
                 else
                     firstReaderHoldCount--;
-            } else {
+            } else {      //非firstThread的情况
                 HoldCounter rh = cachedHoldCounter;
                 if (rh == null || rh.tid != getThreadId(current))
                     rh = readHolds.get();
                 int count = rh.count;
-                if (count <= 1) {
+                if (count <= 1) {    //当前线程重入次数只有一次的时候从ThreadLocal里移除；否则次数减1
                     readHolds.remove();
                     if (count <= 0)
                         throw unmatchedUnlockException();
@@ -422,9 +412,7 @@ public class ReentrantReadWriteLock
                 int c = getState();
                 int nextc = c - SHARED_UNIT;
                 if (compareAndSetState(c, nextc))
-                    // Releasing the read lock has no effect on readers,
-                    // but it may allow waiting writers to proceed if
-                    // both read and write locks are now free.
+                    //所有线程的锁释放完才唤醒下一个节点的线程
                     return nextc == 0;
             }
         }
@@ -435,21 +423,7 @@ public class ReentrantReadWriteLock
         }
 
         protected final int tryAcquireShared(int unused) {
-            /*
-             * Walkthrough:
-             * 1. If write lock held by another thread, fail.
-             * 2. Otherwise, this thread is eligible for
-             *    lock wrt state, so ask if it should block
-             *    because of queue policy. If not, try
-             *    to grant by CASing state and updating count.
-             *    Note that step does not check for reentrant
-             *    acquires, which is postponed to full version
-             *    to avoid having to check hold count in
-             *    the more typical non-reentrant case.
-             * 3. If step 2 fails either because thread
-             *    apparently not eligible or CAS fails or count
-             *    saturated, chain to version with full retry loop.
-             */
+
             Thread current = Thread.currentThread();
             int c = getState();
             //存在写锁情况，并且拥有线程不是当前线程，直接获取失败
@@ -460,15 +434,15 @@ public class ReentrantReadWriteLock
             if (!readerShouldBlock() &&
                 r < MAX_COUNT &&
                 compareAndSetState(c, c + SHARED_UNIT)) { //直接获取读锁，如果获取不成功则执行fullTryAcquireShared循环获取
-                if (r == 0) {      //不存读锁;设置第一个获取读锁的线程为当前线程，计数为1
+                if (r == 0) {  //不存读锁;设置第一个获取读锁的线程为当前线程，计数为1
                     firstReader = current;
                     firstReaderHoldCount = 1;
-                } else if (firstReader == current) {    //存在读锁并且第一个获取锁的线程为当前线程的话则计数+1（重入特性）
+                } else if (firstReader == current) { //存在读锁并且第一个获取锁的线程为当前线程的话则计数+1（重入特性）
                     firstReaderHoldCount++;
                 } else {
                     HoldCounter rh = cachedHoldCounter;
-                    if (rh == null || rh.tid != getThreadId(current))
-                        cachedHoldCounter = rh = readHolds.get();
+                    if (rh == null || rh.tid != getThreadId(current)) //缓存不存在或者缓存不是本线程的cache;那么就从ThreadLocal里获取一个
+                        cachedHoldCounter = rh = readHolds.get();  //获取出来并赋值给cache,记录最近获取读锁的线程信息
                     else if (rh.count == 0)
                         readHolds.set(rh);
                     rh.count++;
@@ -483,12 +457,7 @@ public class ReentrantReadWriteLock
          * and reentrant reads not dealt with in tryAcquireShared.
          */
         final int fullTryAcquireShared(Thread current) {
-            /*
-             * This code is in part redundant with that in
-             * tryAcquireShared but is simpler overall by not
-             * complicating tryAcquireShared with interactions between
-             * retries and lazily reading hold counts.
-             */
+
             HoldCounter rh = null;
             for (;;) {
                 int c = getState();
