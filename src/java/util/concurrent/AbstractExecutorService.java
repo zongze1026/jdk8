@@ -108,7 +108,7 @@ public abstract class AbstractExecutorService implements ExecutorService {
      */
     public Future<?> submit(Runnable task) {
         if (task == null) throw new NullPointerException();
-        RunnableFuture<Void> ftask = newTaskFor(task, null);
+        RunnableFuture<Void> ftask = newTaskFor(task, null); //封装成task任务
         execute(ftask);
         return ftask;
     }
@@ -166,31 +166,31 @@ public abstract class AbstractExecutorService implements ExecutorService {
             // Start one task for sure; the rest incrementally
             futures.add(ecs.submit(it.next()));
             --ntasks;
-            int active = 1;
+            int active = 1; //记录正在执行的任务数，提交的时候加一,任务结束减一
 
             for (;;) {
-                Future<T> f = ecs.poll();
-                if (f == null) {
+                Future<T> f = ecs.poll();  //从BlockingQueue取任务完成的future对象
+                if (f == null) { //f为null说明刚提交的任务还没有执行完毕
                     if (ntasks > 0) {
                         --ntasks;
-                        futures.add(ecs.submit(it.next()));
-                        ++active;
+                        futures.add(ecs.submit(it.next())); //重新提交一个
+                        ++active; //只在执行的任务数加一
                     }
-                    else if (active == 0)
+                    else if (active == 0) //到这里说明任务已经全部提交，并且没有执行中的任务，停止循环
                         break;
-                    else if (timed) {
-                        f = ecs.poll(nanos, TimeUnit.NANOSECONDS);
-                        if (f == null)
+                    else if (timed) { //是否设置超时
+                        f = ecs.poll(nanos, TimeUnit.NANOSECONDS); //加时间限制获取future
+                        if (f == null)  //超时抛出异常
                             throw new TimeoutException();
-                        nanos = deadline - System.nanoTime();
+                        nanos = deadline - System.nanoTime(); //TODO 没看懂为啥要重新计算时间，如果获取到结果应该直接走下一个if判断直接返回了
                     }
                     else
-                        f = ecs.take();
+                        f = ecs.take();//如果没有设置超时的话就阻塞获取执行结果
                 }
-                if (f != null) {
-                    --active;
+                if (f != null) {  //f不为null说明刚刚提交的任务已经执行完毕
+                    --active; //执行的任务数减一
                     try {
-                        return f.get();
+                        return f.get(); //返回执行结果
                     } catch (ExecutionException eex) {
                         ee = eex;
                     } catch (RuntimeException rex) {
@@ -204,7 +204,7 @@ public abstract class AbstractExecutorService implements ExecutorService {
             throw ee;
 
         } finally {
-            for (int i = 0, size = futures.size(); i < size; i++)
+            for (int i = 0, size = futures.size(); i < size; i++) //取消剩余任务
                 futures.get(i).cancel(true);
         }
     }
