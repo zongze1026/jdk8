@@ -90,7 +90,7 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E>
      */
     private static final long serialVersionUID = -817911632652898426L;
 
-    /** The queued items */
+    /** 实际存放数据的容器 */
     final Object[] items;
 
     /** items index for next take, poll, peek or remove */
@@ -259,11 +259,7 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E>
     }
 
     /**
-     * Creates an {@code ArrayBlockingQueue} with the given (fixed)
-     * capacity, the specified access policy and initially containing the
-     * elements of the given collection,
-     * added in traversal order of the collection's iterator.
-     *
+     * 初始化阻塞队列，并添加给定的集合中的元素到队列中
      * @param capacity the capacity of this queue
      * @param fair if {@code true} then queue accesses for threads blocked
      *        on insertion or removal, are processed in FIFO order;
@@ -326,7 +322,7 @@ public class ArrayBlockingQueue<E> extends AbstractQueue<E>
         final ReentrantLock lock = this.lock;
         lock.lock();
         try {
-            if (count == items.length)
+            if (count == items.length) //队列已满，直接返回false
                 return false;
             else {
                 enqueue(e);

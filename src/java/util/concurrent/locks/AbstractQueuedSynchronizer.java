@@ -1867,16 +1867,16 @@ public abstract class AbstractQueuedSynchronizer
         private Node addConditionWaiter() {
             Node t = lastWaiter;
             // If lastWaiter is cancelled, clean out.
-            if (t != null && t.waitStatus != Node.CONDITION) {
+            if (t != null && t.waitStatus != Node.CONDITION) { //todo 没看明白怎么取消无用节点
                 unlinkCancelledWaiters();
                 t = lastWaiter;
             }
             Node node = new Node(Thread.currentThread(), Node.CONDITION);
-            if (t == null)
-                firstWaiter = node;
+            if (t == null) //当前条件队列中没有任何节点
+                firstWaiter = node; //设置当前节点为首节点
             else
-                t.nextWaiter = node;
-            lastWaiter = node;
+                t.nextWaiter = node; //如果条件队列存在节点，那么追加到队尾
+            lastWaiter = node; //无论如何新增节点为尾节点
             return node;
         }
 
@@ -2051,8 +2051,8 @@ public abstract class AbstractQueuedSynchronizer
         public final void await() throws InterruptedException {
             if (Thread.interrupted())
                 throw new InterruptedException();
-            Node node = addConditionWaiter();
-            int savedState = fullyRelease(node);
+            Node node = addConditionWaiter(); //封装当前线程成节点，添加到条件链表尾部
+            int savedState = fullyRelease(node); //释放当前线程所有的锁
             int interruptMode = 0;
             while (!isOnSyncQueue(node)) {
                 LockSupport.park(this);

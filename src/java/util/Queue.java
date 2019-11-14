@@ -143,10 +143,7 @@ package java.util;
  */
 public interface Queue<E> extends Collection<E> {
     /**
-     * Inserts the specified element into this queue if it is possible to do so
-     * immediately without violating capacity restrictions, returning
-     * {@code true} upon success and throwing an {@code IllegalStateException}
-     * if no space is currently available.
+     * 将指定的元素插入此队列，当队列已满，会抛出IllegalStateException异常
      *
      * @param e the element to add
      * @return {@code true} (as specified by {@link Collection#add})
@@ -162,12 +159,7 @@ public interface Queue<E> extends Collection<E> {
     boolean add(E e);
 
     /**
-     * Inserts the specified element into this queue if it is possible to do
-     * so immediately without violating capacity restrictions.
-     * When using a capacity-restricted queue, this method is generally
-     * preferable to {@link #add}, which can fail to insert an element only
-     * by throwing an exception.
-     *
+     * 将指定的元素插入此队列，容量限制队列时，通常使用此方法，当队列已满，则返回false
      * @param e the element to add
      * @return {@code true} if the element was added to this queue, else
      *         {@code false}
@@ -181,27 +173,20 @@ public interface Queue<E> extends Collection<E> {
     boolean offer(E e);
 
     /**
-     * Retrieves and removes the head of this queue.  This method differs
-     * from {@link #poll poll} only in that it throws an exception if this
-     * queue is empty.
-     *
+     * 检索并删除此队列的头部，当队列为空时，会抛出NoSuchElementException异常
      * @return the head of this queue
      * @throws NoSuchElementException if this queue is empty
      */
     E remove();
 
     /**
-     * Retrieves and removes the head of this queue,
-     * or returns {@code null} if this queue is empty.
-     *
+     * 检索并删除此队列的头部，当队列为空时，返回null
      * @return the head of this queue, or {@code null} if this queue is empty
      */
     E poll();
 
     /**
-     * Retrieves, but does not remove, the head of this queue.  This method
-     * differs from {@link #peek peek} only in that it throws an exception
-     * if this queue is empty.
+     * 检索但不删除此队列的头部，当队列为空时，会抛出NoSuchElementException异常
      *
      * @return the head of this queue
      * @throws NoSuchElementException if this queue is empty
@@ -209,8 +194,7 @@ public interface Queue<E> extends Collection<E> {
     E element();
 
     /**
-     * Retrieves, but does not remove, the head of this queue,
-     * or returns {@code null} if this queue is empty.
+     * 检索但不删除此队列的头部，当队列为空时，返回null
      *
      * @return the head of this queue, or {@code null} if this queue is empty
      */
