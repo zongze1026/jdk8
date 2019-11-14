@@ -767,13 +767,14 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     /* ---------------- Fields -------------- */
 
     /**
-     * The array of bins. Lazily initialized upon first insertion.
-     * Size is always a power of two. Accessed directly by iterators.
+     * 装载Node的数组，作为ConcurrentHashMap的数据容器，采用懒加载的方式，
+     * 直到第一次插入数据的时候才会进行初始化操作，数组的大小总是为2的幂次方。
      */
     transient volatile Node<K,V>[] table;
 
     /**
      * The next table to use; non-null only while resizing.
+     * 扩容时使用，平时为null，只有在扩容的时候才为非null
      */
     private transient volatile Node<K,V>[] nextTable;
 
@@ -791,6 +792,11 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
      * when table is null, holds the initial table size to use upon
      * creation, or 0 for default. After initialization, holds the
      * next element count value upon which to resize the table.
+     * 该属性用来控制table数组的大小，根据是否初始化和是否正在扩容有几种情况：
+     * 当值为负数时：**如果为-1表示正在初始化，如果为-N则表示当前正有N-1个线程进行扩容操作；
+     * 当值为正数时：**如果当前数组为null的话表示table在初始化过程中，sizeCtl表示为需要新建数组的长度；
+     * 若已经初始化了，表示当前数据容器（table数组）可用容量也可以理解成临界值（插入节点数超过了该临界值就需要扩容）
+     * 具体指为数组的长度n 乘以 加载因子loadFactor；当值为0时，即数组长度为默认初始值。
      */
     private transient volatile int sizeCtl;
 
@@ -1013,7 +1019,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
         int binCount = 0;
         for (Node<K,V>[] tab = table;;) {
             Node<K,V> f; int n, i, fh;
-            if (tab == null || (n = tab.length) == 0)
+            if (tab == null || (n = tab.length) == 0)//初始化table
                 tab = initTable();
             else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
                 if (casTabAt(tab, i, null,
@@ -2159,6 +2165,8 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
 
     /**
      * A node inserted at head of bins during transfer operations.
+     * 在扩容时才会出现的特殊节点，其key,value,hash全部为null。
+     * 并拥有nextTable指针引用新的table数组
      */
     static final class ForwardingNode<K,V> extends Node<K,V> {
         final Node<K,V>[] nextTable;
@@ -2714,6 +2722,8 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
      * their root. They also maintain a parasitic read-write lock
      * forcing writers (who hold bin lock) to wait for readers (who do
      * not) to complete before tree restructuring operations.
+     * 这个类并不负责包装用户的key、value信息，而是包装的很多TreeNode节点。
+     * 实际的ConcurrentHashMap“数组”中，存放的是TreeBin对象，而不是TreeNode对象。
      */
     static final class TreeBin<K,V> extends Node<K,V> {
         TreeNode<K,V> root;

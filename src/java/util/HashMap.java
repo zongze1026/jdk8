@@ -247,27 +247,17 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
     /**
-     * The bin count threshold for using a tree rather than list for a
-     * bin.  Bins are converted to trees when adding an element to a
-     * bin with at least this many nodes. The value must be greater
-     * than 2 and should be at least 8 to mesh with assumptions in
-     * tree removal about conversion back to plain bins upon
-     * shrinkage.
+     *  当桶(bucket)上的结点数大于这个值时会转成红黑树
      */
     static final int TREEIFY_THRESHOLD = 8;
 
     /**
-     * The bin count threshold for untreeifying a (split) bin during a
-     * resize operation. Should be less than TREEIFY_THRESHOLD, and at
-     * most 6 to mesh with shrinkage detection under removal.
+     * 当桶(bucket)上的结点数小于这个值时树转链表
      */
     static final int UNTREEIFY_THRESHOLD = 6;
 
     /**
-     * The smallest table capacity for which bins may be treeified.
-     * (Otherwise the table is resized if too many nodes in a bin.)
-     * Should be at least 4 * TREEIFY_THRESHOLD to avoid conflicts
-     * between resizing and treeification thresholds.
+     * 桶中结构转化为红黑树对应的table的最小大小
      */
     static final int MIN_TREEIFY_CAPACITY = 64;
 
@@ -387,35 +377,28 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     /* ---------------- Fields -------------- */
 
     /**
-     * The table, initialized on first use, and resized as
-     * necessary. When allocated, length is always a power of two.
-     * (We also tolerate length zero in some operations to allow
-     * bootstrapping mechanics that are currently not needed.)
+     *  存储元素的数组，总是2的幂次倍
      */
     transient Node<K,V>[] table;
 
     /**
-     * Holds cached entrySet(). Note that AbstractMap fields are used
-     * for keySet() and values().
+     * 存放具体元素的集
      */
     transient Set<Map.Entry<K,V>> entrySet;
 
     /**
-     * The number of key-value mappings contained in this map.
+     * 存放元素的个数，注意这个不等于数组的长度。
      */
     transient int size;
 
     /**
-     * The number of times this HashMap has been structurally modified
-     * Structural modifications are those that change the number of mappings in
-     * the HashMap or otherwise modify its internal structure (e.g.,
-     * rehash).  This field is used to make iterators on Collection-views of
-     * the HashMap fail-fast.  (See ConcurrentModificationException).
+     * 每次扩容和更改map结构的计数器
      */
     transient int modCount;
 
     /**
      * The next size value at which to resize (capacity * load factor).
+     * 临界值 当实际大小(容量*填充因子)超过临界值时，会进行扩容
      *
      * @serial
      */
@@ -427,7 +410,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
 
     /**
      * The load factor for the hash table.
-     *
+     * 填充因子
      * @serial
      */
     final float loadFactor;
@@ -568,12 +551,12 @@ public class HashMap<K,V> extends AbstractMap<K,V>
         if ((tab = table) != null && (n = tab.length) > 0 &&
             (first = tab[(n - 1) & hash]) != null) {
             if (first.hash == hash && // always check first node
-                ((k = first.key) == key || (key != null && key.equals(k))))
+                ((k = first.key) == key || (key != null && key.equals(k))))//查找的key就是hash桶中的第一个元素
                 return first;
             if ((e = first.next) != null) {
-                if (first instanceof TreeNode)
+                if (first instanceof TreeNode) //如果时tree型链的话，通过getTreeNode查找
                     return ((TreeNode<K,V>)first).getTreeNode(hash, key);
-                do {
+                do { //如果是单向链表的话，循环查找到对应key的node即可
                     if (e.hash == hash &&
                         ((k = e.key) == key || (key != null && key.equals(k))))
                         return e;
@@ -624,32 +607,32 @@ public class HashMap<K,V> extends AbstractMap<K,V>
     final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
                    boolean evict) {
         Node<K,V>[] tab; Node<K,V> p; int n, i;
-        if ((tab = table) == null || (n = tab.length) == 0)
+        if ((tab = table) == null || (n = tab.length) == 0) //table为空时，需要初始化table
             n = (tab = resize()).length;
-        if ((p = tab[i = (n - 1) & hash]) == null)
+        if ((p = tab[i = (n - 1) & hash]) == null) //table没有被占用情况下，直接赋值到node数组里
             tab[i] = newNode(hash, key, value, null);
-        else {
+        else { //否则的话就是走到hash冲突里了
             Node<K,V> e; K k;
             if (p.hash == hash &&
-                ((k = p.key) == key || (key != null && key.equals(k))))
+                ((k = p.key) == key || (key != null && key.equals(k)))) //key相同
                 e = p;
-            else if (p instanceof TreeNode)
-                e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
-            else {
+            else if (p instanceof TreeNode) // 如果p是红黑树类型，调用putTreeVal方式赋值
+                e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);//这里直接强转成TreeNode是因为他是node的子类
+            else {                                                                    //并通过tree的方式添加
                 for (int binCount = 0; ; ++binCount) {
-                    if ((e = p.next) == null) {
-                        p.next = newNode(hash, key, value, null);
+                    if ((e = p.next) == null) { //hash桶里node的next赋值给e,如果e为null,hash桶只有一个元素
+                        p.next = newNode(hash, key, value, null); //添加到table元素的后面
                         if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
-                            treeifyBin(tab, hash);
+                            treeifyBin(tab, hash);// 结点数量达到阈值，转化为红黑树
                         break;
                     }
-                    if (e.hash == hash &&
+                    if (e.hash == hash && //e不为null判断key是否存在
                         ((k = e.key) == key || (key != null && key.equals(k))))
                         break;
                     p = e;
                 }
             }
-            if (e != null) { // existing mapping for key
+            if (e != null) { //走到这里说明hash桶里存在相同的key,覆盖旧值
                 V oldValue = e.value;
                 if (!onlyIfAbsent || oldValue == null)
                     e.value = value;
@@ -658,7 +641,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             }
         }
         ++modCount;
-        if (++size > threshold)
+        if (++size > threshold) //判断扩容
             resize();
         afterNodeInsertion(evict);
         return null;
