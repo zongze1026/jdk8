@@ -668,7 +668,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             }
             else if ((newCap = oldCap << 1) < MAXIMUM_CAPACITY &&
                      oldCap >= DEFAULT_INITIAL_CAPACITY)
-                newThr = oldThr << 1; // double threshold
+                newThr = oldThr << 1; // double threshold 采用位运算符使容量翻倍
         }
         else if (oldThr > 0) // initial capacity was placed in threshold
             newCap = oldThr;
@@ -686,7 +686,7 @@ public class HashMap<K,V> extends AbstractMap<K,V>
             Node<K,V>[] newTab = (Node<K,V>[])new Node[newCap];
         table = newTab;
         if (oldTab != null) {
-            for (int j = 0; j < oldCap; ++j) {
+            for (int j = 0; j < oldCap; ++j) { //复制元素，重新进行hash来分配元素到对应的桶
                 Node<K,V> e;
                 if ((e = oldTab[j]) != null) {
                     oldTab[j] = null;

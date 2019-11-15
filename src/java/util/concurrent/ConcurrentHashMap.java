@@ -2379,7 +2379,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
         if (nextTab == null) {            // initiating
             try {
                 @SuppressWarnings("unchecked")
-                Node<K,V>[] nt = (Node<K,V>[])new Node<?,?>[n << 1];
+                Node<K,V>[] nt = (Node<K,V>[])new Node<?,?>[n << 1];//初始化原来的table长度为原来的2倍
                 nextTab = nt;
             } catch (Throwable ex) {      // try to cope with OOME
                 sizeCtl = Integer.MAX_VALUE;
