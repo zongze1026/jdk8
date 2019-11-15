@@ -591,7 +591,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     /*
      * Encodings for Node hash fields. See above for explanation.
      */
-    static final int MOVED     = -1; // hash for forwarding nodes
+    static final int MOVED     = -1; //标记特殊节点，当该节点的hash值是-1时为特殊节点，也是扩容的标识
     static final int TREEBIN   = -2; // hash for roots of trees
     static final int RESERVED  = -3; // hash for transient reservations
     static final int HASH_BITS = 0x7fffffff; // usable bits of normal node hash
@@ -943,12 +943,12 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
         if ((tab = table) != null && (n = tab.length) > 0 &&
             (e = tabAt(tab, (n - 1) & h)) != null) {
             if ((eh = e.hash) == h) {
-                if ((ek = e.key) == key || (ek != null && key.equals(ek)))
+                if ((ek = e.key) == key || (ek != null && key.equals(ek)))//hash桶里的首个node就是要找的值，直接返回对应的值
                     return e.val;
             }
-            else if (eh < 0)
+            else if (eh < 0) //hash桶里的节点的hash值小于0说明说红黑树
                 return (p = e.find(h, key)) != null ? p.val : null;
-            while ((e = e.next) != null) {
+            while ((e = e.next) != null) { //要查找的节点不是首节点，并且不是红黑树，循环查找链表到查到为止
                 if (e.hash == h &&
                     ((ek = e.key) == key || (ek != null && key.equals(ek))))
                     return e.val;
@@ -1015,44 +1015,44 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     /** Implementation for put and putIfAbsent */
     final V putVal(K key, V value, boolean onlyIfAbsent) {
         if (key == null || value == null) throw new NullPointerException();
-        int hash = spread(key.hashCode());
+        int hash = spread(key.hashCode()); //计算key的hash值
         int binCount = 0;
         for (Node<K,V>[] tab = table;;) {
             Node<K,V> f; int n, i, fh;
             if (tab == null || (n = tab.length) == 0)//初始化table
                 tab = initTable();
-            else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
-                if (casTabAt(tab, i, null,
+            else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) { //由上面计算出来的hash值取hash桶里的node,如果为空则通过
+                if (casTabAt(tab, i, null,                        //则通过CAS直接存入hash桶里
                              new Node<K,V>(hash, key, value, null)))
-                    break;                   // no lock when adding to empty bin
+                    break;                   // no lock when adding to empty bin 桶里没有元素不加锁
             }
-            else if ((fh = f.hash) == MOVED)
+            else if ((fh = f.hash) == MOVED) //说明正在扩容
                 tab = helpTransfer(tab, f);
             else {
                 V oldVal = null;
                 synchronized (f) {
                     if (tabAt(tab, i) == f) {
-                        if (fh >= 0) {
-                            binCount = 1;
+                        if (fh >= 0) { //说明没有扩容
+                            binCount = 1;//记录该链表下的节点数量，为下面做扩容做准备
                             for (Node<K,V> e = f;; ++binCount) {
                                 K ek;
                                 if (e.hash == hash &&
                                     ((ek = e.key) == key ||
-                                     (ek != null && key.equals(ek)))) {
+                                     (ek != null && key.equals(ek)))) { //key存在新值直接覆盖旧值，最终返回旧值
                                     oldVal = e.val;
                                     if (!onlyIfAbsent)
                                         e.val = value;
                                     break;
                                 }
                                 Node<K,V> pred = e;
-                                if ((e = e.next) == null) {
+                                if ((e = e.next) == null) { //key不存在，直接添加的链表尾部结束
                                     pred.next = new Node<K,V>(hash, key,
                                                               value, null);
                                     break;
                                 }
                             }
                         }
-                        else if (f instanceof TreeBin) {
+                        else if (f instanceof TreeBin) { //如果时红黑树的话就走红黑树的添加方式
                             Node<K,V> p;
                             binCount = 2;
                             if ((p = ((TreeBin<K,V>)f).putTreeVal(hash, key,
@@ -1065,7 +1065,7 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                     }
                 }
                 if (binCount != 0) {
-                    if (binCount >= TREEIFY_THRESHOLD)
+                    if (binCount >= TREEIFY_THRESHOLD)//上面记录的binCount值大于8的话就转成红黑树
                         treeifyBin(tab, i);
                     if (oldVal != null)
                         return oldVal;
